@@ -1,5 +1,9 @@
 # Baseline Results
 
+## Summary
+
+The initial baseline suggests that the page is not meeting performance expectations, mainly because the main content appears too slowly to users.
+
 ## Core Web Vitals — Field Data
 
 Assessment: Failed
@@ -28,8 +32,6 @@ Assessment: Failed
 - Best Practices: 54
 - SEO: 85
 
-## Main issue
+## Interpretation
 
-The page fails the Core Web Vitals assessment mainly because **LCP is too high** !!!
-
-The page is responsive and visually stable, but the largest visible content takes too long to load
+The page is responsive and visually stable, but the largest visible content takes too long to appear. This makes the experience feel slow even though interaction timing and layout stability are acceptable. The main issue is therefore related to loading and rendering performance rather than stability.
