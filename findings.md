@@ -1,40 +1,41 @@
 # Performance Findings
 
-From the homepage baseline. The server itself is fast (root document ~30 ms), so the
-problems are all on the front end: too much media, too much JavaScript, and too many
-third parties. Layout is stable (CLS ~0.001), so shifting is not an issue.
+These are from the homepage. The server responds fast (~30 ms for the document), so
+nothing here is a backend problem, it's all on the front end: too much media, too much
+JavaScript, and a lot of third-party stuff. Layout barely moves (CLS ~0.001) so I didn't
+count that as a problem.
 
-## 1. The page is enormous
+## 1. The page is just too heavy
 
-Affects users: on mobile or a slower connection the page eats a lot of data and takes a long time to finish, so content keeps appearing late.
-Metric: Largest Contentful Paint, Speed Index.
-Cause: about 20 MB total, with ~8 MB of media and ~7 MB of images. Images aren't in modern formats and aren't sized for the device.
-Solution: compress the media, serve WebP/AVIF, use responsive sizes, and lazy-load anything below the fold.
+Affects users: on a phone or slow wifi you're downloading a ton of data, and the content keeps trickling in for ages.
+Metric: LCP, Speed Index.
+Cause: it's around 20 MB total. Most of that is ~8 MB of media and ~7 MB of images that aren't compressed or sized for the screen.
+Solution: compress everything, switch images to WebP/AVIF, serve responsive sizes, and lazy-load what's below the fold.
 
-## 2. Too much JavaScript blocks the main thread
+## 2. Way too much JavaScript
 
-Affects users: the page looks ready but doesn't respond to taps or scrolls for a long time.
-Metric: Total Blocking Time, Time to Interactive.
-Cause: main-thread work is ~48 s, most of it script evaluation, and about 2.1 MB of the JavaScript downloaded is never used.
-Solution: remove the unused code, split bundles, and defer non-critical scripts so less runs up front.
+Affects users: the page looks done but you tap something and nothing happens for a while.
+Metric: TBT, Time to Interactive.
+Cause: the main thread is busy for ~48 s, mostly running scripts, and roughly 2.1 MB of the JS that gets downloaded is never even used.
+Solution: drop the unused code, split the bundles, and defer whatever isn't needed for the first render.
 
-## 3. Third-party scripts dominate the load
+## 3. Third parties are taking over
 
-Affects users: ads and tracking compete with the actual article for bandwidth and CPU, making everything slower.
-Metric: Total Blocking Time, Largest Contentful Paint.
-Cause: third parties account for ~12.7 MB across ~157 requests (ads, analytics, social widgets).
-Solution: cut the third parties that aren't essential, lazy-load the rest, and load non-critical ones after the page is usable.
+Affects users: ads and trackers fight the actual article for bandwidth and CPU, so the thing you came to read loses.
+Metric: TBT, LCP.
+Cause: third-party requests add up to ~12.7 MB across ~157 requests (ads, analytics, social widgets).
+Solution: cut the ones that aren't needed, lazy-load the rest, and hold non-critical ones until the page is usable.
 
-## 4. Largest content shows up very late
+## 4. The main content shows up really late
 
-Affects users: the main headline/hero the user came to read appears only after a long wait, so the site feels broken.
-Metric: Largest Contentful Paint.
-Cause: the LCP element has to wait behind all the JavaScript and heavy media loading at the same time.
-Solution: prioritize the LCP image (fetchpriority=high, preload) and reduce the work happening before it paints.
+Affects users: the headline/hero you opened the page for only appears after a long wait, and it feels broken.
+Metric: LCP.
+Cause: the LCP element is stuck waiting behind all that JavaScript and heavy media loading at the same time.
+Solution: prioritize it (fetchpriority=high, preload) and cut down the work happening before it paints.
 
-## 5. First paint is slow because of render-blocking resources
+## 5. Blank screen for too long at the start
 
-Affects users: the screen stays blank for several seconds before anything appears.
-Metric: First Contentful Paint, Speed Index.
-Cause: render-blocking scripts and CSS, including ~125 KiB of unused CSS.
-Solution: inline the critical CSS, defer the rest, and drop the unused CSS rules.
+Affects users: you stare at nothing for a few seconds before anything appears.
+Metric: FCP, Speed Index.
+Cause: render-blocking scripts and CSS, plus ~125 KiB of CSS that isn't used.
+Solution: inline the critical CSS, defer the rest, and remove the unused rules.
