@@ -2,93 +2,96 @@
 
 ## Summary
 
-The initial baseline suggests that the page is not meeting performance expectations, mainly because the main content appears too slowly to users.
+The page is not doing great. It reacts fine once it's up and it doesn't jump around, but
+the main content shows up too slowly and the screen is blank for a bit at the start. So
+the problem is loading and rendering, not the server and not layout.
 
 ## Core Web Vitals — Field Data
 
-Assessment: Failed
+This is the real-user data from Chrome (last 28 days). I looked at both mobile and desktop
+because they came out a bit different.
 
-- Largest Contentful Paint (LCP): 3.6 s
-  Status: Needs improvement
+Overall: **Failed**, because LCP is not in the good range on either one.
 
-- Interaction to Next Paint (INP): 156 ms
-  Status: Good
+### Mobile
 
-- Cumulative Layout Shift (CLS): 0.03
-  Status: Good
+- Largest Contentful Paint (LCP): **2.9 s** — needs improvement
+- Interaction to Next Paint (INP): **187 ms** — good
+- Cumulative Layout Shift (CLS): **0.04** — good
+- First Contentful Paint (FCP): **2.2 s** — needs improvement
+- Time to First Byte (TTFB): **0.2 s** — good
 
-## Other Field Metrics
+### Desktop
 
-- First Contentful Paint (FCP): 1.9 s
-  Status: Needs improvement
-
-- Time to First Byte (TTFB): 0.2 s
-  Status: Good
+- Largest Contentful Paint (LCP): **3.6 s** — needs improvement
+- Interaction to Next Paint (INP): **163 ms** — good
+- Cumulative Layout Shift (CLS): **0.02** — good
+- First Contentful Paint (FCP): **2.2 s** — needs improvement
+- Time to First Byte (TTFB): **0.2 s** — good
 
 ## Lighthouse Lab Test
 
-- Performance: 30
-- Accessibility: 79
-- Best Practices: 54
-- SEO: 85
+|                | Mobile | Desktop |
+| -------------- | ------ | ------- |
+| Performance    | 40     | 28      |
+| Accessibility  | 75     | 79      |
+| Best Practices | 77     | 35      |
+| SEO            | 85     | 85      |
 
-## Interpretation
+## What this means
 
-The page is responsive and visually stable, but the largest visible content takes too long to appear. This makes the experience feel slow even though interaction timing and layout stability are acceptable. The main issue is therefore related to loading and rendering performance rather than stability.
+The page answers quickly (TTFB is 0.2 s), so the server is not the problem. It reacts fast
+once it loads (INP is good) and it doesn't shift around (CLS is good). What's slow is
+getting the content on the screen: the big content takes too long (LCP) and you stare at
+nothing for a couple of seconds first (FCP). Desktop even scores lower than mobile in the
+lab, which tells me it's not one slow file, it's just a lot of stuff loading and running at
+the same time.
 
-## Network baseline at `/`
+## Network at `/`
 
-I also checked the HAR for the homepage. The first file had some old Network entries in
-it, so I only used the AP News page load from that HAR. For the refresh file, I used the
-last AP News page load, because that is the actual refresh.
+I looked at the homepage HAR (`apnews.com-1.har`). It's one page load. Some requests don't
+have a page tag on them, but those are just late ad and tracker calls that fire during the
+same load, so I counted them in.
 
-### Initial load
+### How heavy the load is
 
-The first AP News load makes **409 requests**.
+The page makes **926 requests**.
 
-It transfers **11.58 MB**, but the total resource size is **28.12 MB**. Compression is
-helping, but the page is still huge. The transfer is about **58.8% smaller** than the
-full resource size.
+It transfers **10.27 MB**, but the total resource size is **27.20 MB**. So compression is
+helping — the browser downloads about **62.2% less** than the full size — but the page is
+still huge.
 
-Most of the downloaded data is code and images.
+### What the bytes are
 
-JS and CSS together are **117 requests**, **4.90 MB transferred**, and **16.81 MB total
-resource size**. So code is about **42.3%** of the download and almost **60%** of the
-total resource size.
+Most of it is code and media.
 
-Images are almost as heavy over the network: **79 requests**, **4.35 MB transferred**,
-and **4.33 MB total resource size**. That is **37.6%** of the downloaded data.
+- **JavaScript**: 161 requests, **4.44 MB** downloaded, 15.20 MB full size. That's 43% of
+  everything downloaded.
+- **Images**: 215 requests, **3.01 MB** downloaded, about 29%. The biggest single image is
+  around **600 KB**.
+- **Fonts**: 21 requests, **1.21 MB**.
+- **CSS**: 19 requests, 0.16 MB downloaded, 1.13 MB full size.
+- The rest is mostly tracker calls (documents and other).
 
-Video/media is smaller in the first load, but it is still there: **6 requests** and
-about **710 KB transferred**.
+JS and CSS together are **180 requests, 4.60 MB** downloaded and **16.33 MB** full size.
+So code alone is about 45% of the download and 60% of the full size. Code is the biggest
+thing on the page.
 
-Third-party stuff is massive. If I count only `apnews.com` and its subdomains as
-first-party, third parties are **338 requests**, **6.29 MB transferred**, and **19.15 MB
-total resource size**. That is more than half of the data downloaded.
+### Third parties
 
-### Soft refresh
+If I count only `apnews.com` and its subdomains as the site itself, then third parties are
+**866 requests and 7.28 MB** — about **71%** of everything downloaded. So most of the page
+is not even AP News's own stuff.
 
-The refresh does not get lighter. It makes **560 requests** and transfers **15.86 MB**.
-That is worse than the first load, not better.
+### Caching
 
-So the cache reduction is basically **0%**. If I calculate it directly from bytes, it is
-around **-37%**, because the refresh downloads about 4.28 MB more than the first load.
-
-This looks like the refresh is not really benefiting from cache. There are no useful
-`304` responses, and almost every request in the refresh has `Cache-Control: no-cache`,
-so the browser goes back to the network again.
-
-The refresh also loads more media than the first load. Media jumps from about **710 KB**
-to **2.85 MB**, mostly from video chunks.
+The cache is basically not helping. There are **no `304` responses and nothing served from
+cache**, and about **31%** of the responses say `no-cache` or `no-store`. So if you come
+back, the browser downloads almost all of it again.
 
 ### Compression notes
 
-JS and CSS are compressed. Most scripts use `br` or `gzip`, with a few using `zstd`.
-Stylesheets use `br` or `gzip`.
-
-Images are different. The main images are already compressed image formats like `webp`,
-`jpeg`, `png`, or `gif`, so they do not really shrink again with transport compression.
-That is why image transferred size and image resource size are basically the same.
-
-Video/media is also already compressed. It transfers almost the same amount as its
-resource size, so caching and lazy loading matter more than gzip here.
+The code compresses well. Most scripts and styles use `br`, `gzip`, or `zstd`, and that's
+why the download is 62% smaller than the full size. The requests with no compression are
+mostly images and fonts, which are already compressed formats, so they don't shrink again
+over the network. For those, caching and smaller/lazy-loaded images matter more than gzip.
