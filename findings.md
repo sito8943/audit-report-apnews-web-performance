@@ -1,76 +1,104 @@
 # Performance Findings
 
-These are from the homepage. The server responds fast (~30 ms for the document), so
-nothing here is a backend problem, it's all on the front end: too much media, too much
-JavaScript, and a lot of third-party stuff. Layout barely moves (CLS ~0.001) so I didn't
-count that as a problem.
+These are from the homepage. The server is fast (TTFB 0.2 s), so nothing here is a backend
+problem. It's all front end: too much JavaScript, too much media, and a ton of third-party
+stuff. Layout barely moves (CLS 0.04 / 0.02) so I didn't count that as a problem.
 
-## 1. The page is just too heavy
+I tried to keep each of these as its own separate thing. When a few problems really just
+show up as the same metric (like the couple of things that push LCP out), I put them
+together instead of listing them twice.
 
-Affects users: on a phone or slow wifi you're downloading a ton of data, and the content keeps trickling in for ages.
-Metric: LCP, Speed Index.
-Cause: the homepage transfers 11.58 MB and has 28.12 MB of total resource size. The main download is code and images.
-Solution: compress everything, switch images to WebP/AVIF, serve responsive sizes, and lazy-load what's below the fold.
+---
+
+## Things to fix
+
+## 1. The main content shows up really late
+
+Affects users: the headline/hero you opened the page for only appears after a long wait,
+and it feels broken even though it isn't.
+Metric: LCP (2.9 s on mobile, 3.6 s on desktop), Speed Index.
+Cause: the LCP element is stuck waiting behind all that JavaScript and heavy media loading
+at the same time.
+Solution: prioritize it (fetchpriority=high, preload) and cut down the work happening
+before it paints.
 
 ## 2. Way too much JavaScript
 
-Affects users: the page looks done but you tap something and nothing happens for a while.
+Affects users: the page looks done but you tap something and nothing happens for a moment,
+because the browser is busy running scripts.
 Metric: TBT, Time to Interactive.
-Cause: the main thread is busy for ~48 s, mostly running scripts. In the HAR, scripts alone transfer 4.76 MB and add up to 15.8 MB of resource size.
-Solution: drop the unused code, split the bundles, and defer whatever isn't needed for the first render.
+Cause: JavaScript is 161 requests, 4.44 MB downloaded, and 15.20 MB of full size. That's
+43% of everything downloaded, and with CSS it's 60% of the full size. That much code takes
+real time to download and run.
+Solution: drop the unused code, split the bundles, and defer whatever isn't needed for the
+first render.
 
 ## 3. Third parties are taking over
 
-Affects users: ads and trackers fight the actual article for bandwidth and CPU, so the thing you came to read loses.
+Affects users: ads and trackers fight the actual article for bandwidth and CPU, so the
+thing you came to read loses.
 Metric: TBT, LCP.
-Cause: third-party requests add up to 338 requests, 6.29 MB transferred, and 19.15 MB total resource size.
-Solution: cut the ones that aren't needed, lazy-load the rest, and hold non-critical ones until the page is usable.
+Cause: third-party requests add up to 866 requests and 7.28 MB downloaded, about 71% of
+everything. Most of the page isn't even AP News's own content.
+Solution: cut the ones that aren't needed, lazy-load the rest, and hold non-critical ones
+until the page is usable.
 
-## 4. The main content shows up really late
+## 4. Blank screen for too long at the start
 
-Affects users: the headline/hero you opened the page for only appears after a long wait, and it feels broken.
-Metric: LCP.
-Cause: the LCP element is stuck waiting behind all that JavaScript and heavy media loading at the same time.
-Solution: prioritize it (fetchpriority=high, preload) and cut down the work happening before it paints.
-
-## 5. Blank screen for too long at the start
-
-Affects users: you stare at nothing for a few seconds before anything appears.
-Metric: FCP, Speed Index.
-Cause: render-blocking scripts and CSS, plus ~125 KiB of CSS that isn't used.
+Affects users: you stare at nothing for a couple of seconds before anything appears.
+Metric: FCP (2.2 s on both), Speed Index.
+Cause: scripts and CSS that block rendering run before the first paint, plus CSS that gets
+downloaded but never used.
 Solution: inline the critical CSS, defer the rest, and remove the unused rules.
 
-## 6. There are way too many requests
+## 5. The cache doesn't help on a second visit
 
-Affects users: the page has a lot of small things fighting to load, which makes the page feel busy and slow.
-Metric: LCP, FCP, Speed Index.
-Cause: the first load has 409 requests. The refresh has 560 requests, which is even worse.
-Solution: reduce third-party calls, lazy-load below-the-fold modules, and avoid loading ad/comment/video systems before the main content.
+Affects users: coming back to the page doesn't feel any cheaper or faster, it downloads
+almost everything again.
+Metric: repeat-load bytes, LCP, FCP.
+Cause: there are no `304` responses and nothing served from cache, and about 31% of the
+responses say `no-cache` or `no-store`, so the browser goes back to the network.
+Solution: let static files be reused from cache with proper cache headers, and stop marking
+everything `no-cache`.
 
-## 7. The refresh is worse than the first load
+## 6. Images and fonts are a real byte problem
 
-Affects users: coming back to the page does not feel cheaper or faster.
-Metric: repeat-load transferred bytes, LCP, FCP, Speed Index.
-Cause: the first load transfers 11.58 MB, but the refresh transfers 15.86 MB. That is about 37% more, so caching is not helping in this capture.
-Solution: let static assets reuse cache, avoid `no-cache` on everything, and stop loading fresh ad/video work on every refresh before the page is usable.
-
-## 8. Images are a real byte problem
-
-Affects users: article photos take a big part of the download, especially on mobile.
+Affects users: photos and fonts take a big part of the download, especially on mobile.
 Metric: LCP, Speed Index.
-Cause: images transfer 4.35 MB on the first load, almost 38% of everything downloaded. The biggest image alone is about 1.32 MB.
-Solution: serve smaller responsive images, use AVIF/WebP where possible, lower quality for thumbnails, and lazy-load images below the first screen.
+Cause: images are 215 requests and 3.01 MB (about 29% of the download), and the biggest one
+alone is around 600 KB. Fonts add another 1.21 MB. These are already-compressed formats, so
+gzip doesn't shrink them, they come through almost full size.
+Solution: serve smaller responsive images, use AVIF/WebP, lazy-load images below the first
+screen, and cut down the fonts.
 
-## 9. Video starts adding weight too early
+## 7. There are way too many requests
 
-Affects users: users who came to scan headlines still pay for video chunks.
-Metric: LCP, Speed Index, bandwidth use.
-Cause: media is 710 KB on the first load, then jumps to 2.85 MB on refresh because video chunks load again.
-Solution: don't load video chunks until the player is visible or the user interacts with it.
+Affects users: the page has hundreds of little things fighting to load, which makes it feel
+busy and slow.
+Metric: LCP, FCP, Speed Index.
+Cause: the load has 926 requests, and most of them are third-party ad and tracker calls.
+Solution: reduce third-party calls, lazy-load below-the-fold modules, and don't load
+ad/comment/video systems before the main content.
 
-## 10. Compression helps code, but not images and video
+---
 
-Affects users: compression reduces JS/CSS cost, but the media bytes still come through almost full size.
-Metric: transferred bytes, LCP, Speed Index.
-Cause: JS and CSS shrink well because they use `br`, `gzip`, or `zstd`. Images and video are already compressed formats, so transferred size is basically the same as resource size.
-Solution: keep text compression, but fix media with better formats, smaller responsive sizes, lazy loading, and caching.
+## Things it does well
+
+## 8. The layout doesn't jump around
+
+The page stays stable while it loads (CLS 0.04 on mobile, 0.02 on desktop, both good).
+Nothing moves under your finger when you go to tap something. Worth keeping this as they
+add more content, by giving images and ads their space up front.
+
+## 9. It reacts fast once it's up
+
+Even with all that JavaScript, interactions feel quick (INP 187 ms on mobile, 163 ms on
+desktop, both good). So the pain is really in the loading, not in using the page after it
+loads.
+
+## 10. Fast server and good compression on the code
+
+The server answers quickly (TTFB 0.2 s), so the slowness isn't coming from the backend. And
+the text compression is doing its job, the page downloads 62% less than its full size
+because the JS and CSS are compressed. So that part is already fine, what's left to fix is
+the media and the caching.
