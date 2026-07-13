@@ -2,18 +2,22 @@
 
 ## Summary
 
-The page is not doing great. It reacts fine once it's up and it doesn't jump around, but
-the main content shows up too slowly and the screen is blank for a bit at the start. So
-the problem is loading and rendering, not the server and not layout.
+The page is not doing great, and mobile is the one I care about most here — that's where
+most people read the news, so that's the experience I'm judging it by. It reacts fine once
+it's up and it doesn't jump around, but the main content shows up too slowly and the screen
+is blank for a bit at the start. So the problem is loading and rendering, not the server and
+not layout. I ran the lab test on a throttled mobile setup (the same one we used in class),
+so the numbers below reflect a real phone on a slow connection, not a laptop on fast wifi.
 
 ## Core Web Vitals — Field Data
 
 This is the real-user data from Chrome (last 28 days). I looked at both mobile and desktop
 because they came out a bit different.
 
-Overall: **Failed**, because LCP is not in the good range on either one.
+Overall: **Failed**, because LCP is not in the good range on either one. Mobile is listed
+first on purpose — it's the connection type most readers actually show up on.
 
-### Mobile
+### Mobile — Failed
 
 - Largest Contentful Paint (LCP): **2.9 s** — needs improvement
 - Interaction to Next Paint (INP): **187 ms** — good
@@ -21,7 +25,7 @@ Overall: **Failed**, because LCP is not in the good range on either one.
 - First Contentful Paint (FCP): **2.2 s** — needs improvement
 - Time to First Byte (TTFB): **0.2 s** — good
 
-### Desktop
+### Desktop — Failed
 
 - Largest Contentful Paint (LCP): **3.6 s** — needs improvement
 - Interaction to Next Paint (INP): **163 ms** — good
@@ -30,6 +34,13 @@ Overall: **Failed**, because LCP is not in the good range on either one.
 - Time to First Byte (TTFB): **0.2 s** — good
 
 ## Lighthouse Lab Test
+
+I ran the mobile column with the throttling we used in class: Slow 4G on the network (around
+1.6 Mbps down, 750 Kbps up, 150 ms round trip) plus a 4× CPU slowdown, emulating a mid-range
+phone. The desktop column is the normal desktop profile with no throttling. So the two
+columns aren't really the same test — mobile is deliberately handicapped to match what a
+phone on a cell connection actually goes through, which is why I trust the mobile number
+more for judging real users.
 
 |                | Mobile | Desktop |
 | -------------- | ------ | ------- |
@@ -45,7 +56,10 @@ once it loads (INP is good) and it doesn't shift around (CLS is good). What's sl
 getting the content on the screen: the big content takes too long (LCP) and you stare at
 nothing for a couple of seconds first (FCP). Desktop even scores lower than mobile in the
 lab, which tells me it's not one slow file, it's just a lot of stuff loading and running at
-the same time.
+the same time. And keep in mind the mobile lab number is already on a throttled phone, so
+that's the honest version of what a reader on a phone gets — the real-user mobile data still
+fails LCP (2.9 s) on top of that. So the work I'd prioritize is the mobile load: get the
+content to paint sooner on a slow connection and stop shipping so much before it does.
 
 ## Network at `/`
 
