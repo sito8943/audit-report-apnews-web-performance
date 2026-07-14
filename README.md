@@ -30,3 +30,4 @@ AP News is a strong candidate for a performance audit because it is a content-he
 
 - `baseline.md`: Initial Core Web Vitals and PageSpeed Insights results.
 - `findings.md`: Main performance issues found during the audit.
+- `prioritization.md`: The ICE scoring I use to rank the fixes, and the resulting order.
