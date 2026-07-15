@@ -48,10 +48,14 @@ Ranked:
 | 3 | Main content shows up really late | 8 | 9 | 7 | **504** |
 | 8 | Images and fonts are a real byte problem | 7 | 8 | 7 | **392** |
 | 7 | Cache doesn't help on a second visit | 5 | 9 | 8 | **360** |
+| 13 | Third parties load the wrong way | 7 | 8 | 6 | **336** |
 | 1 | Mobile is the one that's really slow | 9 | 8 | 4 | **288** |
+| 11 | One CSS bundle, 90% unused | 5 | 9 | 5 | **225** |
+| 10 | One JS bundle for the whole site | 6 | 9 | 4 | **216** |
 | 6 | Blank screen for too long at the start | 6 | 7 | 5 | **210** |
 | 2 | JavaScript is heavier on a phone | 7 | 7 | 4 | **196** |
 | 4 | Way too much JavaScript | 8 | 8 | 3 | **192** |
+| 12 | No source maps in production | 2 | 10 | 9 | **180** |
 | 5 | Third parties are taking over | 8 | 7 | 3 | **168** |
 | 9 | There are way too many requests | 5 | 7 | 4 | **140** |
 
