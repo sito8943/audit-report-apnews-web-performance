@@ -195,3 +195,100 @@ Do any seem inappropriate? The duplicated Dianomi tag is just a bug, reCAPTCHA d
 belong on the homepage, `html-load.cc` is a mystery domain running code on a news site,
 and a synchronous quiz widget in the head is a strange thing to make every reader wait
 for.
+
+## Coverage, frames, and layers at `/`
+
+For this part I measured the live homepage with the DevTools Coverage API and a scripted
+scroll test, on the same mobile emulation as before (390px viewport, 4× CPU throttle).
+Byte numbers in this section are **uncompressed** — that's what Coverage reports — so
+they're bigger than the transfer sizes in the network section.
+
+### Coverage — CSS
+
+**Does it extract critical CSS? Not really.** The HTML has **18 separate inline `<style>`
+tags (~35 KB)**, but reading them they're not an extracted critical path — they're ad-hoc
+patches: theme variables, ad-slot spacing fixes, one-off widget tweaks. The actual
+styling still comes from the single `All.min.css` bundle, and the 2.2 s of blank screen
+(FCP) says the critical path isn't being served first. Piecemeal inlining isn't the same
+thing as critical CSS extraction.
+
+**How much unused CSS, and where from?** **88% of first-party CSS is unused at load**
+(722 of 819 KB uncompressed). The sources:
+
+- `All.min.css` — **89% unused** (700 of 782 KB). The whole-site design system shipped to
+  every page, as already noted in the bundle section; Coverage confirms it rule by rule.
+- Viafoura (comments widget) — three stylesheets, **~180 KB, 98–100% unused**, for a
+  widget that isn't even visible on the homepage.
+- Google Fonts CSS — **100% unused** (~27 KB): third-party widgets pull Roboto,
+  Merriweather and Poppins that the page doesn't render with.
+
+**Corrective finding:** extract real critical CSS for the homepage templates and load
+`All.min.css` async; and stop letting Viafoura inject 180 KB of styles for a widget
+below the fold.
+
+### Coverage — JS
+
+**How much unused JS, and where from?** First-party: **74% unused** (839 KB of 1.13 MB).
+But first-party is a rounding error here — the tracked third-party JS is **13 MB
+uncompressed, 66% unused (8.55 MB)**. Top offenders:
+
+- Nativo's `s.ntv.io/serve/load.js` — **loaded twice**, 910 KB each time, 84% and 81%
+  unused. That's ~1.8 MB of sponsored-content loader for one page, duplicated the same
+  way the Dianomi tag is duplicated.
+- reCAPTCHA — 870 KB, 72% unused, still with no form to protect.
+- The ad stack: Freestar's `pubfig.engine.mobile.js` (614 KB, 82% unused), `prebid.js`
+  (577 KB, 82% unused), Google's `pubads_impl.js` (617 KB, 78% unused).
+- Wunderkind/BounceExchange (537 KB, 76% unused) and Viafoura's `vf-v2.js` (669 KB, 58%
+  unused).
+
+**Corrective finding:** the duplicated Nativo loader is a straight bug — one tag instead
+of two saves ~900 KB of parse-and-execute without changing anything on the page.
+
+### Frames — load, scrolling, interaction
+
+I drove a continuous scroll through the page (300 frames sampled, CPU 4×) and watched
+frame times and long tasks.
+
+- **Load:** **22 long tasks totaling ~2.35 s** of main-thread blockage, the worst at
+  242 ms. That's the ad stack, consent manager and trackers all booting at once, and
+  it's exactly the "blank screen then late content" the metrics section describes.
+- **Scrolling:** average frame **23 ms** (~43 fps), with **20 dropped frames of 300** —
+  16 of them severe (>50 ms), worst **367 ms**. Alongside them: **14 long tasks** during
+  the scroll, up to 287 ms. The causes line up with what's on the page: ad slots
+  initializing and refreshing as they enter the viewport (Freestar/GPT), lazy embeds
+  (JW Player, Viafoura) booting mid-scroll, all on the main thread.
+- **Are they excessive or unexpected?** Both worse than Harbour.Space by a lot (20 vs 6
+  dropped frames on the same test). Excessive: 1 frame in 15 misses, and several misses
+  are 5–20× the frame budget. Unexpected: no — sadly this is what an ad-funded page with
+  ~30 third parties does; but reading a news list should not hitch for a third of a
+  second.
+
+**Corrective finding:** ad slot initialization fires on the scroll path; moving slot
+init/refresh off the interaction path (idle scheduling, bigger lazy margins so slots
+init *before* they're visible) would remove most of the severe frame drops.
+
+### Layers and animations
+
+I scanned every element's computed style for layer-forcing properties and pulled the
+compositor layer tree:
+
+- **27 composited layers** on the loaded page. The creators are the usual suspects:
+  the fixed header and leaderboard ad container (8 `position: fixed/sticky` elements
+  total), the video player, and each animating widget.
+- **`will-change` is actually disciplined here: 2 elements**, both the hamburger menu
+  with `will-change: transform`. That's restrained — but it's declared in the
+  stylesheet, so both layers exist permanently for a menu that's almost never open.
+- **No `translate3d(0,0,0)` / `translateZ(0)` hacks** in computed styles, and only two
+  `backface-visibility: hidden`. Nothing smells force-hacked.
+- The animations I could identify (menu slide, Flickity carousel drag, fades) run on
+  **transform/opacity — composition-driven**, not layout or paint. I didn't find
+  layout-animating CSS (`top/left/width` transitions) in the shipped styles.
+
+What I couldn't verify headless: whether anything *feels* janky first-frame on a real
+device, and per-layer memory in the Layers panel — that's the manual DevTools pass still
+to do. Given the scroll numbers above, any jank a user feels here is main-thread long
+tasks, not compositing.
+
+**Corrective finding:** scope the hamburger's `will-change: transform` to the open state
+(add it on interaction, or via a class toggled when the menu opens) instead of keeping
+two forced layers alive for the page's whole lifetime.
