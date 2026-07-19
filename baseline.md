@@ -292,3 +292,71 @@ tasks, not compositing.
 **Corrective finding:** scope the hamburger's `will-change: transform` to the open state
 (add it on interaction, or via a class toggled when the menu opens) instead of keeping
 two forced layers alive for the page's whole lifetime.
+
+## Rendering strategies
+
+AP News doesn't give you a `__NEXT_DATA__` blob to read like a Next.js site would, so I
+had to work it out from the responses themselves: what's already in the HTML when it
+arrives, and what the cache headers say about where it came from.
+
+### What's used where
+
+Every page type I checked — the homepage, a hub page (`/hub/china`), a section page
+(`/world-news`) and a regular article — comes back as **fully server-rendered HTML**.
+The headlines, the article body, the story promos: all of it is in the document before
+any JavaScript runs. There's no app framework doing hydration (no Next, no Nuxt, no
+React root); it's the Brightspot CMS rendering pages on the server, old-school, and
+then that little `All.min.js` bundle adding behavior on top.
+
+The interesting part is the caching in front of it. The homepage is served with
+`max-age=120` and I got it with `age: 62`, so I was reading a copy the CDN rendered a
+minute earlier. Articles and hubs go further: `max-age=30, s-maxage=31536000` — the
+browser can keep them for 30 seconds, but the CDN is allowed to keep them for **a
+year**, which only works because they must purge the cache when a story updates. So in
+practice the strategy is: render once on the server, serve everyone from the edge, and
+invalidate on publish. SSR at the origin, but what users actually receive is closer to
+a static site.
+
+Everything interactive — ads, the video player, the comments, the quizzes — is the
+opposite: client-side rendered by third-party JavaScript after the page lands. So it's
+really two strategies stacked: SSR for the journalism, CSR for everything around it.
+
+### How this affects users, and the tradeoffs
+
+For reading news this is the right shape and you can see it in the field data: TTFB is
+0.2 s because the edge answers, the content is in the HTML so it's indexable and it
+paints without waiting for an app to boot, and INP is fine because there's barely any
+hydration work to do. The classic tradeoff — stale content between purges — is handled
+by the purge-on-publish setup, and `stale-if-error=86400` even lets them keep serving
+yesterday's homepage if the origin dies, which for a news site is a sane emergency mode.
+
+But there are two prices being paid. The first is that server-rendering *everything*
+made the documents enormous: the homepage HTML is **2.4 MB** because something like 148
+story promos are rendered into it — nobody scrolls through 148 stories, but every phone
+downloads and parses all of them before LCP. The second is that the CSR half of the
+stack (the ad tech, video, comments) is exactly what the earlier sections caught
+blocking the main thread for ~2.3 s at load and dropping frames during scroll. The
+rendering strategy gets the content to the browser fast, and then the client-side layer
+takes the win back.
+
+### Is it the right choice? Is it the best choice?
+
+For a news site I think SSR + CDN is not just right, it's the only reasonable choice —
+readers arrive from links, read one page and leave, so pre-rendered cacheable HTML
+beats any client-side approach, and articles that update on a breaking story need
+purge-based invalidation anyway. The CSR layer for ads and widgets is also normal for
+the business, even if the current amount of it is not.
+
+Where it stops being the best version of itself is in the details, and that's where my
+two corrective findings are:
+
+1. **The homepage renders far too much of itself.** 2.4 MB of HTML for one screen of
+   visible content means the SSR is doing work nobody asked for. Render the first
+   couple of screens' worth of promos server-side and load the long tail on scroll —
+   the page would keep its fast-paint benefits with a document a fraction of the size.
+2. **The 30-second browser cache has no fallback.** After `max-age=30` expires, a
+   returning reader re-downloads the whole ~1 MB article document — and the network
+   section already showed the site serves **no 304s at all**, so there's no
+   conditional-request path to soften it. Pair the short `max-age` with working
+   `ETag`/`Last-Modified` revalidation so a revisit costs a 304 instead of a full
+   megabyte.
