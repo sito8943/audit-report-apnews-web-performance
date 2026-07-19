@@ -235,7 +235,11 @@ uncompressed, 66% unused (8.55 MB)**. Top offenders:
 - Nativo's `s.ntv.io/serve/load.js` — **loaded twice**, 910 KB each time, 84% and 81%
   unused. That's ~1.8 MB of sponsored-content loader for one page, duplicated the same
   way the Dianomi tag is duplicated.
-- reCAPTCHA — 870 KB, 72% unused, still with no form to protect.
+- reCAPTCHA — 870 KB, 72% unused, still with no form to protect. (The third-party
+  section quotes this one as 383 KB and 66% — that's the compressed transfer size from
+  an earlier run, while this is the uncompressed code the browser actually has to
+  parse, measured fresh. Same script, two rulers; I'm leaving both numbers in because
+  each section uses its own unit consistently.)
 - The ad stack: Freestar's `pubfig.engine.mobile.js` (614 KB, 82% unused), `prebid.js`
   (577 KB, 82% unused), Google's `pubads_impl.js` (617 KB, 78% unused).
 - Wunderkind/BounceExchange (537 KB, 76% unused) and Viafoura's `vf-v2.js` (669 KB, 58%
